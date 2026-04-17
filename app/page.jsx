@@ -9,6 +9,7 @@ import WhyChooseUs from '@/components/sections/WhyChooseUs'
 import CoursesSection from '@/components/sections/CoursesSection'
 import VisaCategorySection from '@/components/sections/VisaCategorySection'
 import CTASection from '@/components/sections/CTASection'
+import OurServicesSection from '@/components/sections/OurServicesSection'
 
 export default function HomePage() {
     return (
@@ -234,6 +235,9 @@ export default function HomePage() {
 
             {/* Why Choose Us Section */}
             <WhyChooseUs />
+
+            {/* Our Services Section */}
+            <OurServicesSection />
 
             {/* Courses Section */}
             <CoursesSection />

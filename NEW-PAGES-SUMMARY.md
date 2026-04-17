@@ -11,7 +11,7 @@ Successfully created two new pages for the Flying Horse Visa Services website:
 - **Hero Section** with animated introduction
 - **Team Statistics** showing:
   - 15+ Team Members
-  - 25+ Years Experience
+  - 5+ Years Experience
   - 98% Success Rate
   - 5000+ Happy Students
 - **Team Member Cards** displaying:
@@ -26,7 +26,7 @@ Successfully created two new pages for the Flying Horse Visa Services website:
 - **Responsive Design** (mobile, tablet, desktop)
 
 ### Team Members Included:
-1. Rajesh Kumar - Founder & CEO (25+ years)
+1. Rajesh Kumar - Founder & CEO (5+ years)
 2. Priya Sharma - Head of Training (15+ years)
 3. Amit Verma - Senior Visa Consultant (12+ years)
 4. Neha Gupta - English Language Trainer (10+ years)

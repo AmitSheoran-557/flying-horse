@@ -227,7 +227,7 @@ export default function ServicesPage() {
                     <div className="grid md:grid-cols-3 gap-6 md:gap-8">
                         {[
                             {
-                                title: '25+ Years Experience',
+                                title: '5+ Years Experience',
                                 description: 'Decades of expertise in visa services and language training',
                                 icon: <CheckCircle className="h-8 w-8" />
                             },

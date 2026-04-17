@@ -37,7 +37,7 @@ A fully functional, modern website for Flying Horse Visa Services Pvt Ltd with a
 - ✅ Owner image with circular frame
 - ✅ Rotating gradient border
 - ✅ Orbiting icons (star, checkmark)
-- ✅ "25+ Years Experience" badge
+- ✅ "5+ Years Experience" badge
 - ✅ Floating animations
 - ✅ Fully responsive
 
@@ -154,7 +154,7 @@ A fully functional, modern website for Flying Horse Visa Services Pvt Ltd with a
 **Flying Horse Visa Services Pvt Ltd**
 - **Address**: SCO 73-74, Red Square Market, Hisar, Haryana
 - **Email**: enquiry.flyhousevisaservices@gmail.com
-- **Experience**: 25+ Years
+- **Experience**: 5+ Years
 - **Services**: Visa Services, PTE, IELTS, Spoken English
 
 ---
