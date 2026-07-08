@@ -1,253 +1,225 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { ArrowRight, Users, Star, CheckCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { ArrowRight, BookOpen, CheckCircle, Clock, CreditCard, GraduationCap, ShieldCheck, Users, Video } from 'lucide-react'
+import { collection, getDocs } from 'firebase/firestore'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
-import WhyChooseUs from '@/components/sections/WhyChooseUs'
-import CoursesSection from '@/components/sections/CoursesSection'
-import VisaCategorySection from '@/components/sections/VisaCategorySection'
-import CTASection from '@/components/sections/CTASection'
-import OurServicesSection from '@/components/sections/OurServicesSection'
+import { db, isFirebaseConfigured } from '@/lib/firebase'
+
+const emptyPaymentAccount = {
+    upi: '',
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    ifsc: '',
+}
 
 export default function HomePage() {
+    const [batches, setBatches] = useState([])
+    const [loadingBatches, setLoadingBatches] = useState(true)
+    const [paymentAccount, setPaymentAccount] = useState(emptyPaymentAccount)
+
+    const highlights = [
+        { icon: Video, title: 'Unlocked Video Lessons', text: 'Access batch videos and individual lessons after admin approval.' },
+        { icon: Users, title: 'Batch-Based Learning', text: 'Join structured course batches with focused progress tracking.' },
+        { icon: ShieldCheck, title: 'UTR Verification', text: 'Submit only your UTR number for admin review and activation.' },
+    ]
+
+    useEffect(() => {
+        async function loadBatches() {
+            if (!isFirebaseConfigured) {
+                setBatches([])
+                setLoadingBatches(false)
+                return
+            }
+
+            try {
+                const snapshot = await getDocs(collection(db, 'batches'))
+                setBatches(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
+            } catch (error) {
+                setBatches([])
+            } finally {
+                setLoadingBatches(false)
+            }
+        }
+
+        async function loadPaymentAccount() {
+            try {
+                const response = await fetch('/api/payment-account', { cache: 'no-store' })
+                if (!response.ok) return
+                const account = await response.json()
+                setPaymentAccount({
+                    upi: account.upi || '',
+                    bankName: account.bankName || '',
+                    accountName: account.accountName || '',
+                    accountNumber: account.accountNumber || '',
+                    ifsc: account.ifsc || '',
+                })
+            } catch (error) {
+                setPaymentAccount(emptyPaymentAccount)
+            }
+        }
+
+        loadBatches()
+        loadPaymentAccount()
+    }, [])
+
+    const batchOptions = useMemo(() => {
+        return batches
+            .map((batch) => ({
+                id: String(batch.id || '').trim(),
+                name: String(batch.name || batch.title || batch.courseName || '').trim(),
+                amount: String(batch.amount || batch.price || batch.fee || '').trim(),
+                duration: String(batch.duration || batch.batchDuration || '').trim(),
+                highlight: String(batch.highlight || batch.description || batch.summary || '').trim(),
+            }))
+            .filter((batch) => batch.id && batch.name && batch.amount)
+    }, [batches])
+
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-slate-50">
             <Header />
-
-            {/* Hero Section */}
-            <section className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 text-white py-20 overflow-hidden">
-                {/* Animated Background Elements */}
-                <div className="absolute inset-0">
-                    <motion.div
-                        animate={{
-                            scale: [1, 1.2, 1],
-                            rotate: [0, 90, 180],
-                            opacity: [0.1, 0.2, 0.1],
-                        }}
-                        transition={{
-                            duration: 20,
-                            repeat: Infinity,
-                            ease: "linear"
-                        }}
-                        className="absolute top-0 left-0 w-96 h-96 bg-blue-400 rounded-full blur-3xl"
-                    />
-                    <motion.div
-                        animate={{
-                            scale: [1.2, 1, 1.2],
-                            rotate: [180, 90, 0],
-                            opacity: [0.1, 0.2, 0.1],
-                        }}
-                        transition={{
-                            duration: 15,
-                            repeat: Infinity,
-                            ease: "linear"
-                        }}
-                        className="absolute bottom-0 right-0 w-96 h-96 bg-purple-400 rounded-full blur-3xl"
-                    />
-                </div>
-
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex flex-col lg:flex-row items-center gap-12">
-                        {/* Left Content */}
-                        <motion.div
-                            initial={{ opacity: 0, x: -50 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 1, ease: "easeOut" }}
-                            className="flex-1 text-center lg:text-left"
-                        >
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.2, duration: 0.8 }}
-                            >
-                                <motion.h1
-                                    animate={{
-                                        textShadow: [
-                                            "0 0 20px rgba(255,255,255,0.3)",
-                                            "0 0 40px rgba(255,255,255,0.5)",
-                                            "0 0 20px rgba(255,255,255,0.3)",
-                                        ]
-                                    }}
-                                    transition={{
-                                        duration: 3,
-                                        repeat: Infinity,
-                                        ease: "easeInOut"
-                                    }}
-                                    className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 !leading-tight"
-                                >
-                                    Flying Horse Visa Services
-                                </motion.h1>
-                            </motion.div>
-
-                            <motion.p
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.4, duration: 0.8 }}
-                                className="text-xl md:text-2xl mb-6 text-blue-100"
-                            >
-                                Your Gateway to Global Opportunities
-                            </motion.p>
-
-                            <motion.p
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.6, duration: 0.8 }}
-                                className="text-lg mb-10 text-blue-50 max-w-2xl mx-auto lg:mx-0"
-                            >
-                                Professional visa services and world-class English language training.
-                                Master PTE, IELTS, and Spoken English with our expert instructors.
-                            </motion.p>
-
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.8, duration: 0.8 }}
-                                className="flex flex-col sm:flex-row gap-4 items-center justify-center lg:justify-start"
-                            >
+            <section className="bg-white">
+                <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-20">
+                    <div className="flex flex-col justify-center">
+                        <span className="mb-4 inline-flex w-fit items-center gap-2 rounded-full bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700">
+                            <GraduationCap className="h-4 w-4" />
+                            Online Student LMS
+                        </span>
+                        <h1 className="max-w-3xl text-4xl font-bold leading-tight text-gray-950 sm:text-5xl lg:text-6xl">
+                            Learn smarter with batch-wise online courses.
+                        </h1>
+                        <p className="mt-6 max-w-2xl text-lg leading-8 text-gray-600">
+                            Pay to the registered account shown here, submit your UTR number, and unlock the right videos as soon as your payment is approved.
+                        </p>
+                        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                            <Link href="/subscribe" className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700">
+                                Subscribe Now <ArrowRight className="ml-2 h-5 w-5" />
+                            </Link>
+                            <Link href="/student/login" className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3 font-semibold text-gray-800 transition hover:border-primary-500 hover:text-primary-700">
+                                Student Login
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-slate-900 p-5 text-white shadow-2xl">
+                        <div className="rounded-xl bg-white p-4 text-gray-900">
+                            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
                                 <div>
-                                    <Link href="/courses" className="lg:p-3 p-2 border-white border transition-all duration-300 overflow-hidden rounded-lg hover:bg-white hover:text-blue-500 inline-flex items-center">
-                                        Explore Courses <ArrowRight className="ml-2 h-5 w-5" />
-                                    </Link>
+                                    <p className="text-sm text-gray-500">Student progress</p>
+                                    <h2 className="text-xl font-bold">Course Dashboard</h2>
                                 </div>
-                                <div>
-                                    <Link href="/contact" className="lg:p-3 p-2 border-white border transition-all duration-300 overflow-hidden rounded-lg hover:bg-white hover:text-blue-500 inline-flex items-center">
-                                        Contact Us
-                                    </Link>
-                                </div>
-                            </motion.div>
-                        </motion.div>
-
-                        {/* Right Side - Owner Image */}
-                        <motion.div
-                            initial={{ opacity: 0, x: 50, rotateY: 90 }}
-                            animate={{ opacity: 1, x: 0, rotateY: 0 }}
-                            transition={{ duration: 1, delay: 0.3, ease: "easeOut" }}
-                            className="flex-1 relative"
-                        >
-                            <motion.div
-                                animate={{
-                                    y: [0, -20, 0],
-                                }}
-                                transition={{
-                                    duration: 4,
-                                    repeat: Infinity,
-                                    ease: "easeInOut"
-                                }}
-                                className="relative"
-                            >
-                                {/* Glowing Border Effect */}
-                                <motion.div
-                                    animate={{
-                                        rotate: [0, 360],
-                                    }}
-                                    transition={{
-                                        duration: 10,
-                                        repeat: Infinity,
-                                        ease: "linear"
-                                    }}
-                                    className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 blur-xl opacity-50"
-                                />
-
-                                {/* Owner Image Container */}
-                                <div className="relative lg:w-96 lg:h-96 w-80 h-80 mx-auto">
-                                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-sm border-4 border-white/30 shadow-2xl overflow-hidden">
-                                        {/* Owner image - Replace the src with actual image path */}
-                                        <img
-                                            src="https://res.cloudinary.com/dw0lrectk/image/upload/v1773469307/fl-3_hlnuo3.jpg"
-                                            alt="Founder - Flying Horse Visa Services"
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => {
-                                                // Fallback to placeholder if image not found
-                                                e.currentTarget.style.display = 'none';
-                                                const fallback = e.currentTarget.nextElementSibling;
-                                                if (fallback) {
-                                                    fallback.classList.remove('hidden');
-                                                    fallback.classList.add('flex');
-                                                }
-                                            }}
-                                        />
-                                        {/* Fallback placeholder */}
-                                        <div className="hidden absolute inset-0 w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 items-center justify-center">
-                                            <Users className="h-32 w-32 text-gray-500" />
+                                <BookOpen className="h-8 w-8 text-primary-600" />
+                            </div>
+                            <div className="mt-5 space-y-4">
+                                {loadingBatches ? (
+                                    <div className="rounded-lg border border-gray-200 p-4 text-sm font-semibold text-gray-500">
+                                        Loading batches...
+                                    </div>
+                                ) : null}
+                                {!loadingBatches && !batchOptions.length ? (
+                                    <div className="rounded-lg border border-gray-200 p-4 text-sm font-semibold text-gray-500">
+                                        No batches are available right now.
+                                    </div>
+                                ) : null}
+                                {batchOptions.slice(0, 3).map((course, index) => (
+                                    <div key={course.id} className="rounded-lg border border-gray-200 p-4">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div>
+                                                <h3 className="font-semibold">{course.name}</h3>
+                                                <p className="text-sm text-gray-500">{course.duration || 'Active batch'}</p>
+                                            </div>
+                                            <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-semibold text-green-700">
+                                                Rs. {course.amount}
+                                            </span>
+                                        </div>
+                                        <div className="mt-3 h-2 rounded-full bg-gray-100">
+                                            <div className="h-2 rounded-full bg-primary-600" style={{ width: `${58 + index * 14}%` }} />
                                         </div>
                                     </div>
-
-                                    {/* Floating Badge */}
-                                    <motion.div
-                                        animate={{
-                                            rotate: [0, 5, -5, 0],
-                                            scale: [1, 1.05, 1],
-                                        }}
-                                        transition={{
-                                            duration: 3,
-                                            repeat: Infinity,
-                                            ease: "easeInOut"
-                                        }}
-                                        className="absolute -bottom-4 -right-4 bg-white text-primary-600 rounded-2xl p-4 shadow-2xl"
-                                    >
-                                        <div className="text-center">
-                                            <div className="text-3xl font-bold">5+</div>
-                                            <div className="text-xs font-semibold">Years</div>
-                                            <div className="text-xs font-semibold">Experience</div>
-                                        </div>
-                                    </motion.div>
-
-                                    {/* Orbiting Elements */}
-                                    <motion.div
-                                        animate={{
-                                            rotate: [0, 360],
-                                        }}
-                                        transition={{
-                                            duration: 8,
-                                            repeat: Infinity,
-                                            ease: "linear"
-                                        }}
-                                        className="absolute inset-0"
-                                    >
-                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-yellow-400 rounded-full shadow-lg flex items-center justify-center">
-                                            <Star className="h-6 w-6 text-white" />
-                                        </div>
-                                    </motion.div>
-
-                                    <motion.div
-                                        animate={{
-                                            rotate: [360, 0],
-                                        }}
-                                        transition={{
-                                            duration: 10,
-                                            repeat: Infinity,
-                                            ease: "linear"
-                                        }}
-                                        className="absolute inset-0"
-                                    >
-                                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-12 h-12 bg-green-400 rounded-full shadow-lg flex items-center justify-center">
-                                            <CheckCircle className="h-6 w-6 text-white" />
-                                        </div>
-                                    </motion.div>
-                                </div>
-                            </motion.div>
-                        </motion.div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="mt-4 rounded-xl bg-white/10 p-4 text-sm">
+                            <div className="flex items-center gap-2 text-primary-100">
+                                <CreditCard className="h-4 w-4" />
+                                <span className="font-semibold">Registered payment account</span>
+                            </div>
+                            <div className="mt-3 grid gap-2 text-gray-100 sm:grid-cols-2">
+                                <p><span className="text-gray-300">A/C No:</span> {paymentAccount.accountNumber || 'Loading...'}</p>
+                                <p><span className="text-gray-300">IFSC:</span> {paymentAccount.ifsc || 'Loading...'}</p>
+                                <p><span className="text-gray-300">UPI:</span> {paymentAccount.upi || 'Loading...'}</p>
+                                <p><span className="text-gray-300">Bank:</span> {paymentAccount.bankName || 'Loading...'}</p>
+                            </div>
+                            <p className="mt-3 text-gray-300">No screenshot upload is required. Keep your UTR number ready after payment.</p>
+                        </div>
                     </div>
                 </div>
             </section>
-
-            {/* Why Choose Us Section */}
-            <WhyChooseUs />
-
-            {/* Our Services Section */}
-            <OurServicesSection />
-
-            {/* Courses Section */}
-            <CoursesSection />
-
-            {/* Visa Category Section */}
-            <VisaCategorySection />
-
-            {/* CTA Section */}
-            <CTASection />
-
+            <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+                <div className="grid gap-5 md:grid-cols-3">
+                    {highlights.map((item) => (
+                        <div key={item.title} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                            <item.icon className="h-9 w-9 text-primary-600" />
+                            <h2 className="mt-4 text-xl font-bold text-gray-950">{item.title}</h2>
+                            <p className="mt-2 text-gray-600">{item.text}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+            <section className="bg-white py-14">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                        <div>
+                            <p className="font-semibold text-primary-600">Courses and subscriptions</p>
+                            <h2 className="mt-2 text-3xl font-bold text-gray-950">Choose the batch that fits your goal.</h2>
+                        </div>
+                        <Link href="/subscribe" className="inline-flex items-center font-semibold text-primary-700">
+                            Start subscription <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
+                    </div>
+                    <div className="mt-8 grid gap-5 md:grid-cols-3">
+                        {loadingBatches ? (
+                            <div className="rounded-xl border border-gray-200 p-6 text-gray-600 shadow-sm">
+                                Loading batches...
+                            </div>
+                        ) : null}
+                        {!loadingBatches && !batchOptions.length ? (
+                            <div className="rounded-xl border border-gray-200 p-6 text-gray-600 shadow-sm">
+                                No batches are available right now. Please check again later.
+                            </div>
+                        ) : null}
+                        {batchOptions.map((course) => (
+                            <div key={course.id} className="rounded-xl border border-gray-200 p-6 shadow-sm">
+                                <div className="flex items-center gap-3 text-primary-700">
+                                    <Clock className="h-5 w-5" />
+                                    <span className="font-semibold">{course.duration || 'Active batch'}</span>
+                                </div>
+                                <h3 className="mt-4 text-2xl font-bold text-gray-950">{course.name}</h3>
+                                <p className="mt-3 min-h-[72px] text-gray-600">{course.highlight || 'Course details are managed by admin.'}</p>
+                                <div className="mt-5 flex items-end gap-2">
+                                    <span className="text-3xl font-bold text-gray-950">Rs. {course.amount}</span>
+                                    <span className="pb-1 text-gray-500">one-time</span>
+                                </div>
+                                <Link href={`/subscribe?course=${course.id}`} className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-gray-950 px-4 py-3 font-semibold text-white transition hover:bg-primary-700">
+                                    Subscribe
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+            <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+                <div className="rounded-2xl bg-primary-700 px-6 py-10 text-white md:px-10">
+                    <CheckCircle className="h-10 w-10" />
+                    <h2 className="mt-4 text-3xl font-bold">Already subscribed?</h2>
+                    <p className="mt-3 max-w-2xl text-primary-50">Log in to check your payment status and continue watching unlocked course videos after activation.</p>
+                    <Link href="/student/login" className="mt-6 inline-flex rounded-lg bg-white px-5 py-3 font-semibold text-primary-700 transition hover:bg-primary-50">
+                        Student Login
+                    </Link>
+                </div>
+            </section>
             <Footer />
         </div>
     )

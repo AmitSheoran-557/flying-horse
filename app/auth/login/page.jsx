@@ -23,15 +23,23 @@ export default function LoginPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+        const email = formData.email.trim()
+        const password = formData.password
+
+        if (!email || !password) {
+            toast.error('Please enter your email and password')
+            return
+        }
+
         setIsLoading(true)
 
         try {
-            const success = await login(formData.email, formData.password)
-            if (success) {
+            const result = await login(email, password)
+            if (result.success) {
                 toast.success('Login successful!')
                 router.push('/dashboard')
             } else {
-                toast.error('Invalid email or password')
+                toast.error(result.error || 'Invalid email or password')
             }
         } catch (error) {
             toast.error('An error occurred. Please try again.')

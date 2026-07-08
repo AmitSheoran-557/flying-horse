@@ -1,0 +1,347 @@
+'use client'
+
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import toast from 'react-hot-toast'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { addDoc, collection, doc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore'
+import { ArrowLeft, BadgeIndianRupee, CheckCircle, CreditCard } from 'lucide-react'
+import { auth, db, isFirebaseConfigured } from '@/lib/firebase'
+import { paymentInstructions } from '@/lib/lms-data'
+
+const emptyPaymentAccount = {
+    upi: '',
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    ifsc: '',
+}
+
+function SubscribeForm() {
+    const router = useRouter()
+    const searchParams = useSearchParams()
+    const selectedCourse = searchParams.get('course')
+    const [batches, setBatches] = useState([])
+    const [loadingBatches, setLoadingBatches] = useState(true)
+    const [paymentAccount, setPaymentAccount] = useState(emptyPaymentAccount)
+    const [loadingPaymentAccount, setLoadingPaymentAccount] = useState(true)
+    const [submitting, setSubmitting] = useState(false)
+    const [form, setForm] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        batchId: '',
+        amount: '',
+        utrNumber: '',
+        password: '',
+    })
+
+    useEffect(() => {
+        async function loadBatches() {
+            if (!isFirebaseConfigured) {
+                setBatches([])
+                setLoadingBatches(false)
+                return
+            }
+
+            try {
+                const snapshot = await getDocs(collection(db, 'batches'))
+                setBatches(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
+            } catch (error) {
+                setBatches([])
+            } finally {
+                setLoadingBatches(false)
+            }
+        }
+
+        loadBatches()
+    }, [])
+
+    useEffect(() => {
+        async function loadPaymentAccount() {
+            try {
+                const response = await fetch('/api/payment-account', { cache: 'no-store' })
+                if (!response.ok) {
+                    throw new Error('Payment account request failed.')
+                }
+
+                const account = await response.json()
+                setPaymentAccount({
+                    upi: account.upi || '',
+                    bankName: account.bankName || '',
+                    accountName: account.accountName || '',
+                    accountNumber: account.accountNumber || '',
+                    ifsc: account.ifsc || '',
+                })
+            } catch (error) {
+                toast.error('Could not load payment account details.')
+                setPaymentAccount(emptyPaymentAccount)
+            } finally {
+                setLoadingPaymentAccount(false)
+            }
+        }
+
+        loadPaymentAccount()
+    }, [])
+
+    const batchOptions = useMemo(() => {
+        if (batches.length) {
+            return batches
+                .map((batch) => ({
+                    id: String(batch.id || '').trim(),
+                    name: String(batch.name || batch.title || batch.courseName || '').trim(),
+                    amount: String(batch.amount || batch.price || batch.fee || '').trim(),
+                    description: String(batch.description || batch.summary || batch.highlight || '').trim(),
+                }))
+                .filter((batch) => batch.id && batch.name && batch.amount)
+        }
+
+        return []
+    }, [batches])
+
+    useEffect(() => {
+        if (!batchOptions.length) return
+
+        setForm((current) => {
+            const currentBatch = batchOptions.find((batch) => batch.id === current.batchId)
+            if (currentBatch) {
+                return {
+                    ...current,
+                    amount: current.amount || currentBatch.amount,
+                }
+            }
+
+            const queryBatch = batchOptions.find((batch) => batch.id === selectedCourse)
+            if (queryBatch) {
+                return {
+                    ...current,
+                    batchId: queryBatch.id,
+                    amount: queryBatch.amount,
+                }
+            }
+
+            return {
+                ...current,
+                batchId: '',
+                amount: '',
+            }
+        })
+    }, [batchOptions, selectedCourse])
+
+    const selectedBatch = batchOptions.find((batch) => batch.id === form.batchId)
+    const selectedBatchName = selectedBatch?.name || ''
+
+    function updateField(name, value) {
+        if (name === 'batchId') {
+            const selected = batchOptions.find((batch) => batch.id === value)
+            if (!selected) {
+                setForm((current) => ({
+                    ...current,
+                    batchId: '',
+                    amount: '',
+                }))
+                return
+            }
+
+            setForm((current) => ({
+                ...current,
+                batchId: selected.id,
+                amount: selected.amount,
+            }))
+            return
+        }
+
+        setForm((current) => ({ ...current, [name]: value }))
+    }
+
+    async function handleSubmit(event) {
+        event.preventDefault()
+
+        if (!isFirebaseConfigured) {
+            toast.error('Firebase environment variables are not configured.')
+            return
+        }
+
+        if (!form.name.trim() || !form.email.trim() || !form.phone.trim() || !selectedBatch || !selectedBatch.amount || !form.utrNumber.trim() || !form.password) {
+            toast.error('Please fill all required fields.')
+            return
+        }
+
+        if (form.password.length < 6) {
+            toast.error('Password must be at least 6 characters.')
+            return
+        }
+
+        if (!paymentAccount.accountNumber) {
+            toast.error('Payment account details are still loading. Please try again.')
+            return
+        }
+
+        setSubmitting(true)
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, form.email.trim(), form.password)
+            const uid = userCredential.user.uid
+            await updateProfile(userCredential.user, { displayName: form.name.trim() })
+
+            await setDoc(doc(db, 'users', uid), {
+                role: 'student',
+                email: form.email.trim(),
+                displayName: form.name.trim(),
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            })
+
+            await setDoc(doc(db, 'students', uid), {
+                name: form.name.trim(),
+                fullName: form.name.trim(),
+                email: form.email.trim(),
+                phone: form.phone.trim(),
+                batchId: form.batchId,
+                batchName: selectedBatchName,
+                course: selectedBatchName,
+                amount: selectedBatch.amount,
+                utrNumber: form.utrNumber.trim(),
+                joiningDate: new Date().toISOString().slice(0, 10),
+                paymentMode: 'Online',
+                paymentStatus: 'Pending',
+                accountStatus: 'Blocked',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            })
+
+            await addDoc(collection(db, 'paymentRequests'), {
+                studentId: uid,
+                studentName: form.name.trim(),
+                email: form.email.trim(),
+                phone: form.phone.trim(),
+                batchId: form.batchId,
+                batchName: selectedBatchName,
+                amount: selectedBatch.amount,
+                utrNumber: form.utrNumber.trim(),
+                registeredAccountNumber: paymentAccount.accountNumber,
+                paymentMode: 'Online',
+                status: 'Pending',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            })
+
+            await addDoc(collection(db, 'notifications'), {
+                type: 'payment',
+                title: 'New payment request',
+                message: `${form.name.trim()} submitted a payment request for Rs. ${selectedBatch.amount}.`,
+                read: false,
+                createdAt: serverTimestamp(),
+            })
+
+            toast.success('Subscription submitted. Your payment is under review.')
+            router.push('/student/dashboard')
+        } catch (error) {
+            const message = error?.code === 'auth/email-already-in-use'
+                ? 'This email is already registered. Please log in or use another email.'
+                : error?.message || 'Could not submit subscription.'
+            toast.error(message)
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    return (
+        <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-6xl">
+                <Link href="/" className="inline-flex items-center text-sm font-semibold text-primary-700">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to home
+                </Link>
+                <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+                    <aside className="rounded-2xl bg-gray-950 p-6 text-white shadow-xl">
+                        <CreditCard className="h-10 w-10 text-primary-300" />
+                        <h1 className="mt-4 text-3xl font-bold">Manual payment instructions</h1>
+                        <p className="mt-3 text-gray-300">Complete your payment outside the app, then submit the details for admin approval.</p>
+                        <div className="mt-6 space-y-3 rounded-xl bg-white/10 p-4">
+                            {loadingPaymentAccount ? (
+                                <p className="text-gray-300">Loading registered account details...</p>
+                            ) : (
+                                <>
+                                    <p><span className="text-gray-300">UPI:</span> {paymentAccount.upi || 'Not available'}</p>
+                                    <p><span className="text-gray-300">Bank:</span> {paymentAccount.bankName || 'Not available'}</p>
+                                    <p><span className="text-gray-300">Account:</span> {paymentAccount.accountName || 'Not available'}</p>
+                                    <p><span className="text-gray-300">Registered A/C No:</span> {paymentAccount.accountNumber || 'Not available'}</p>
+                                    <p><span className="text-gray-300">IFSC:</span> {paymentAccount.ifsc || 'Not available'}</p>
+                                </>
+                            )}
+                        </div>
+                        <div className="mt-6 space-y-3">
+                            {paymentInstructions.map((item) => (
+                                <div key={item} className="flex gap-3 text-sm text-gray-200">
+                                    <CheckCircle className="mt-0.5 h-4 w-4 flex-none text-green-300" />
+                                    <span>{item}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </aside>
+
+                    <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <BadgeIndianRupee className="h-8 w-8 text-primary-600" />
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-950">Subscribe to a course</h2>
+                                <p className="text-sm text-gray-500">Your account activates after admin payment approval.</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 grid gap-4 md:grid-cols-2">
+                            <label className="md:col-span-2">
+                                <span className="text-sm font-semibold text-gray-700">Full name</span>
+                                <input className="input-field mt-1" value={form.name} onChange={(event) => updateField('name', event.target.value)} required />
+                            </label>
+                            <label>
+                                <span className="text-sm font-semibold text-gray-700">Email</span>
+                                <input type="email" className="input-field mt-1" value={form.email} onChange={(event) => updateField('email', event.target.value)} required />
+                            </label>
+                            <label>
+                                <span className="text-sm font-semibold text-gray-700">Phone</span>
+                                <input className="input-field mt-1" value={form.phone} onChange={(event) => updateField('phone', event.target.value)} required />
+                            </label>
+                            <label>
+                                <span className="text-sm font-semibold text-gray-700">Selected batch/course</span>
+                                <select className="input-field mt-1" value={selectedBatch ? form.batchId : ''} onChange={(event) => updateField('batchId', event.target.value)} disabled={loadingBatches} required>
+                                    <option value="">{loadingBatches ? 'Loading batches...' : 'Select a batch'}</option>
+                                    {batchOptions.map((batch) => (
+                                        <option key={batch.id} value={batch.id}>{batch.name}</option>
+                                    ))}
+                                </select>
+                                {!loadingBatches && !batchOptions.length ? (
+                                    <p className="mt-1 text-sm text-red-600">No batches are available. Please contact admin.</p>
+                                ) : null}
+                            </label>
+                            <label>
+                                <span className="text-sm font-semibold text-gray-700">Amount</span>
+                                <input className="input-field mt-1 bg-slate-50" value={selectedBatch?.amount || ''} readOnly required />
+                            </label>
+                            <label>
+                                <span className="text-sm font-semibold text-gray-700">UTR / transaction number</span>
+                                <input className="input-field mt-1" value={form.utrNumber} onChange={(event) => updateField('utrNumber', event.target.value)} required />
+                            </label>
+                            <label>
+                                <span className="text-sm font-semibold text-gray-700">Password for student login</span>
+                                <input type="password" minLength={6} className="input-field mt-1" value={form.password} onChange={(event) => updateField('password', event.target.value)} required />
+                            </label>
+                        </div>
+
+                        <button type="submit" disabled={submitting || loadingPaymentAccount} className="mt-6 w-full rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-70">
+                            {submitting ? 'Submitting...' : 'Submit Subscription'}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    )
+}
+
+export default function SubscribePage() {
+    return (
+        <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-slate-50 text-gray-700">Loading subscription...</main>}>
+            <SubscribeForm />
+        </Suspense>
+    )
+}

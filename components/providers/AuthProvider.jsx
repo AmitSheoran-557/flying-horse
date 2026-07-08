@@ -65,11 +65,11 @@ export function AuthProvider({ children }) {
                     localStorage.setItem('token', data.token)
                 }
                 setUser(data.user)
-                return true
+                return { success: true }
             }
-            return false
+            return { success: false, error: data.error || 'Login failed' }
         } catch (error) {
-            return false
+            return { success: false, error: 'Login failed. Please try again.' }
         }
     }
 
@@ -90,11 +90,11 @@ export function AuthProvider({ children }) {
                     localStorage.setItem('token', data.token)
                 }
                 setUser(data.user)
-                return true
+                return { success: true }
             }
-            return false
+            return { success: false, error: data.error || 'Failed to create account' }
         } catch (error) {
-            return false
+            return { success: false, error: 'Failed to create account. Please try again.' }
         }
     }
 

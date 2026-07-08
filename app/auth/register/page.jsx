@@ -26,6 +26,14 @@ export default function RegisterPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+        const name = formData.name.trim()
+        const email = formData.email.trim()
+        const password = formData.password
+
+        if (!name || !email || !password || !formData.confirmPassword) {
+            toast.error('Please fill all required fields')
+            return
+        }
 
         if (formData.password !== formData.confirmPassword) {
             toast.error('Passwords do not match')
@@ -40,12 +48,12 @@ export default function RegisterPage() {
         setIsLoading(true)
 
         try {
-            const success = await register(formData.name, formData.email, formData.password)
-            if (success) {
+            const result = await register(name, email, password)
+            if (result.success) {
                 toast.success('Account created successfully!')
                 router.push('/dashboard')
             } else {
-                toast.error('Failed to create account. Email may already exist.')
+                toast.error(result.error || 'Failed to create account. Email may already exist.')
             }
         } catch (error) {
             toast.error('An error occurred. Please try again.')

@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-
-// In a real app, you would use a database
-// For demo purposes, we'll use the same in-memory store
-// This would be imported from a shared module in a real app
-const users = []
+import { findUserByEmail } from '@/lib/data-store'
 
 export async function POST(request) {
     try {
         const { email, password } = await request.json()
+        const trimmedEmail = String(email || '').trim().toLowerCase()
+        const rawPassword = String(password || '')
+
+        if (!trimmedEmail || !rawPassword) {
+            return NextResponse.json(
+                { error: 'Email and password are required' },
+                { status: 400 }
+            )
+        }
 
         // Find user
-        const user = users.find(user => user.email === email)
+        const user = findUserByEmail(trimmedEmail)
         if (!user) {
             return NextResponse.json(
                 { error: 'Invalid credentials' },
@@ -31,7 +36,7 @@ export async function POST(request) {
 
         // Create JWT token
         const token = jwt.sign(
-            { userId: user.id, email: user.email },
+            { userId: user.id, email: user.email, role: user.role },
             process.env.JWT_SECRET || 'fallback-secret',
             { expiresIn: '7d' }
         )
@@ -45,9 +50,8 @@ export async function POST(request) {
             user: userWithoutPassword
         })
     } catch (error) {
-        console.error('Login error:', error)
         return NextResponse.json(
-            { error: 'Internal server error' },
+            { error: 'Unable to log in. Please try again.' },
             { status: 500 }
         )
     }

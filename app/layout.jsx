@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
     title: 'Germany Visa & German Language Classes | Flying Horse Visa',
-    description: 'Get expert help for Germany visa, Ausbildung, and German language courses (A1–B2). Book a free demo class today.',
+    description: 'Get expert help for Germany visa, Ausbildung, and German language courses (A1-B2). Book a free demo class today.',
     keywords: 'Germany visa, Ausbildung India, German classes A1 A2 B1 B2',
     openGraph: {
         title: 'Flying Horse Visa',

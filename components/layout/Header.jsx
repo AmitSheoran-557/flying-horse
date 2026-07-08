@@ -4,11 +4,18 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Menu, X, User, LogOut } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
 import { useAuth } from '@/hooks/useAuth'
+import { auth, db, isFirebaseConfigured } from '@/lib/firebase'
 
 export default function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [firebaseUser, setFirebaseUser] = useState(null)
+    const [firebaseRole, setFirebaseRole] = useState('')
     const { user, logout } = useAuth()
+    const currentUser = user || firebaseUser
+    const dashboardHref = firebaseUser && firebaseRole === 'student' ? '/student/dashboard' : '/dashboard'
 
     const navigation = [
         { name: 'Home', href: '/' },
@@ -17,7 +24,35 @@ export default function Header() {
         { name: 'Team', href: '/team' },
         { name: 'Gallery', href: '/gallery' },
         { name: 'Contact', href: '/contact' },
+        { name: 'Subscribe', href: '/subscribe' },
     ]
+
+    useEffect(() => {
+        if (!isFirebaseConfigured) return undefined
+
+        const unsubscribe = onAuthStateChanged(auth, async (activeUser) => {
+            setFirebaseUser(activeUser)
+            setFirebaseRole('')
+
+            if (!activeUser) return
+
+            try {
+                const userDoc = await getDoc(doc(db, 'users', activeUser.uid))
+                setFirebaseRole(userDoc.exists() ? userDoc.data()?.role || '' : '')
+            } catch (error) {
+                setFirebaseRole('')
+            }
+        })
+
+        return () => unsubscribe()
+    }, [])
+
+    async function handleLogout() {
+        logout()
+        if (isFirebaseConfigured && auth.currentUser) {
+            await firebaseSignOut(auth)
+        }
+    }
 
     // Prevent body scroll when menu is open
     useEffect(() => {
@@ -63,17 +98,17 @@ export default function Header() {
                                 </Link>
                             ))}
 
-                            {user ? (
+                            {currentUser ? (
                                 <div className="flex items-center space-x-4">
                                     <Link
-                                        href="/dashboard"
+                                        href={dashboardHref}
                                         className="flex items-center space-x-2 text-gray-700 hover:text-primary-600"
                                     >
                                         <User className="h-5 w-5" />
-                                        <span>Dashboard</span>
+                                        <span>Profile</span>
                                     </Link>
                                     <button
-                                        onClick={logout}
+                                        onClick={handleLogout}
                                         className="flex items-center space-x-2 text-gray-700 hover:text-red-600"
                                     >
                                         <LogOut className="h-5 w-5" />
@@ -83,16 +118,16 @@ export default function Header() {
                             ) : (
                                 <div className="flex items-center space-x-4">
                                     <Link
-                                        href="/auth/login"
+                                        href="/student/login"
                                         className="text-gray-700 hover:text-primary-600 font-medium"
                                     >
-                                        Login
+                                        Student Login
                                     </Link>
                                     <Link
-                                        href="/auth/register"
+                                        href="/subscribe"
                                         className="btn-primary"
                                     >
-                                        Sign Up
+                                        Subscribe
                                     </Link>
                                 </div>
                             )}
@@ -191,19 +226,19 @@ export default function Header() {
                             <div className="my-6 h-px bg-gray-200" />
 
                             {/* User Section */}
-                            {user ? (
+                            {currentUser ? (
                                 <div className="space-y-1">
                                     <Link
-                                        href="/dashboard"
+                                        href={dashboardHref}
                                         className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-600 rounded-lg transition-all duration-200"
                                         onClick={() => setIsMenuOpen(false)}
                                     >
                                         <User className="h-5 w-5 flex-shrink-0" />
-                                        <span className="font-medium">Dashboard</span>
+                                        <span className="font-medium">Profile</span>
                                     </Link>
                                     <button
                                         onClick={() => {
-                                            logout()
+                                            handleLogout()
                                             setIsMenuOpen(false)
                                         }}
                                         className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-200"
@@ -215,18 +250,18 @@ export default function Header() {
                             ) : (
                                 <div className="space-y-3">
                                     <Link
-                                        href="/auth/login"
+                                        href="/student/login"
                                         className="block px-4 py-3 text-center text-gray-700 hover:bg-primary-50 hover:text-primary-600 font-medium rounded-lg border-2 border-gray-200 transition-all duration-200"
                                         onClick={() => setIsMenuOpen(false)}
                                     >
-                                        Login
+                                        Student Login
                                     </Link>
                                     <Link
-                                        href="/auth/register"
+                                        href="/subscribe"
                                         className="block px-4 py-3 text-center bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg transition-all duration-200"
                                         onClick={() => setIsMenuOpen(false)}
                                     >
-                                        Sign Up
+                                        Subscribe
                                     </Link>
                                 </div>
                             )}

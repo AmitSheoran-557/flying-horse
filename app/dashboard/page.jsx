@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, Clock, Play, Lock, Calendar, Award } from 'lucide-react'
+import { BookOpen, Clock, Play, Lock, Calendar, Award, CreditCard, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
@@ -13,6 +13,7 @@ export default function DashboardPage() {
     const { user, loading } = useAuth()
     const router = useRouter()
     const [enrolledCourses, setEnrolledCourses] = useState([])
+    const [paymentAccount, setPaymentAccount] = useState(null)
 
     useEffect(() => {
         if (!loading && !user) {
@@ -39,6 +40,20 @@ export default function DashboardPage() {
             ])
         }
     }, [user, loading, router])
+
+    useEffect(() => {
+        async function loadPaymentAccount() {
+            try {
+                const response = await fetch('/api/payment-account', { cache: 'no-store' })
+                if (!response.ok) return
+                setPaymentAccount(await response.json())
+            } catch (error) {
+                setPaymentAccount(null)
+            }
+        }
+
+        loadPaymentAccount()
+    }, [])
 
     if (loading) {
         return (
@@ -189,6 +204,42 @@ export default function DashboardPage() {
                                 </motion.div>
                             ))}
                         </div>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6, delay: 0.25 }}
+                            className="card p-6"
+                        >
+                            <div className="flex items-center justify-between gap-4">
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900">Payment Verification</h3>
+                                    <p className="mt-1 text-gray-600">Use the registered account below and submit only your UTR number for admin approval.</p>
+                                </div>
+                                <ShieldCheck className="h-8 w-8 flex-shrink-0 text-primary-600" />
+                            </div>
+                            <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                                <div className="rounded-lg bg-slate-50 p-4">
+                                    <p className="text-sm text-gray-500">Registered A/C No</p>
+                                    <p className="mt-1 font-semibold text-gray-950">{paymentAccount?.accountNumber || 'Loading...'}</p>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 p-4">
+                                    <p className="text-sm text-gray-500">IFSC</p>
+                                    <p className="mt-1 font-semibold text-gray-950">{paymentAccount?.ifsc || 'Loading...'}</p>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 p-4">
+                                    <p className="text-sm text-gray-500">UPI</p>
+                                    <p className="mt-1 font-semibold text-gray-950">{paymentAccount?.upi || 'Loading...'}</p>
+                                </div>
+                                <div className="rounded-lg bg-slate-50 p-4">
+                                    <p className="text-sm text-gray-500">Required Proof</p>
+                                    <p className="mt-1 font-semibold text-gray-950">UTR number only</p>
+                                </div>
+                            </div>
+                            <Link href="/subscribe" className="mt-5 inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700">
+                                <CreditCard className="mr-2 h-4 w-4" /> Submit UTR
+                            </Link>
+                        </motion.div>
 
                         {/* Quick Actions */}
                         <motion.div

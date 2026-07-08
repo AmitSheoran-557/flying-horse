@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
+import { findUserById } from '@/lib/data-store'
 
-// In a real app, you would use a database
-const users = []
+export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
     try {
@@ -20,7 +20,7 @@ export async function GET(request) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret')
 
         // Find user
-        const user = users.find(user => user.id === decoded.userId)
+        const user = findUserById(decoded.userId)
         if (!user) {
             return NextResponse.json(
                 { error: 'User not found' },
@@ -35,7 +35,6 @@ export async function GET(request) {
             user: userWithoutPassword
         })
     } catch (error) {
-        console.error('Token verification error:', error)
         return NextResponse.json(
             { error: 'Invalid token' },
             { status: 401 }
