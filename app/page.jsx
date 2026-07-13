@@ -7,19 +7,12 @@ import { collection, getDocs } from 'firebase/firestore'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { db, isFirebaseConfigured } from '@/lib/firebase'
-
-const emptyPaymentAccount = {
-    upi: '',
-    bankName: '',
-    accountName: '',
-    accountNumber: '',
-    ifsc: '',
-}
+import { usePaymentSettings } from '@/hooks/usePaymentSettings'
 
 export default function HomePage() {
     const [batches, setBatches] = useState([])
     const [loadingBatches, setLoadingBatches] = useState(true)
-    const [paymentAccount, setPaymentAccount] = useState(emptyPaymentAccount)
+    const { paymentSettings } = usePaymentSettings()
 
     const highlights = [
         { icon: Video, title: 'Unlocked Video Lessons', text: 'Access batch videos and individual lessons after admin approval.' },
@@ -45,25 +38,7 @@ export default function HomePage() {
             }
         }
 
-        async function loadPaymentAccount() {
-            try {
-                const response = await fetch('/api/payment-account', { cache: 'no-store' })
-                if (!response.ok) return
-                const account = await response.json()
-                setPaymentAccount({
-                    upi: account.upi || '',
-                    bankName: account.bankName || '',
-                    accountName: account.accountName || '',
-                    accountNumber: account.accountNumber || '',
-                    ifsc: account.ifsc || '',
-                })
-            } catch (error) {
-                setPaymentAccount(emptyPaymentAccount)
-            }
-        }
-
         loadBatches()
-        loadPaymentAccount()
     }, [])
 
     const batchOptions = useMemo(() => {
@@ -147,10 +122,10 @@ export default function HomePage() {
                                 <span className="font-semibold">Registered payment account</span>
                             </div>
                             <div className="mt-3 grid gap-2 text-gray-100 sm:grid-cols-2">
-                                <p><span className="text-gray-300">A/C No:</span> {paymentAccount.accountNumber || 'Loading...'}</p>
-                                <p><span className="text-gray-300">IFSC:</span> {paymentAccount.ifsc || 'Loading...'}</p>
-                                <p><span className="text-gray-300">UPI:</span> {paymentAccount.upi || 'Loading...'}</p>
-                                <p><span className="text-gray-300">Bank:</span> {paymentAccount.bankName || 'Loading...'}</p>
+                                <p><span className="text-gray-300">A/C No:</span> {paymentSettings.accountNumber || 'Loading...'}</p>
+                                <p><span className="text-gray-300">IFSC:</span> {paymentSettings.ifsc || 'Loading...'}</p>
+                                <p><span className="text-gray-300">UPI:</span> {paymentSettings.upi || 'Loading...'}</p>
+                                <p><span className="text-gray-300">Bank:</span> {paymentSettings.bankName || 'Loading...'}</p>
                             </div>
                             <p className="mt-3 text-gray-300">No screenshot upload is required. Keep your UTR number ready after payment.</p>
                         </div>

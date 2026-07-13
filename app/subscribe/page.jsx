@@ -8,15 +8,7 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { addDoc, collection, doc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore'
 import { ArrowLeft, BadgeIndianRupee, CheckCircle, CreditCard } from 'lucide-react'
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase'
-import { paymentInstructions } from '@/lib/lms-data'
-
-const emptyPaymentAccount = {
-    upi: '',
-    bankName: '',
-    accountName: '',
-    accountNumber: '',
-    ifsc: '',
-}
+import { usePaymentSettings } from '@/hooks/usePaymentSettings'
 
 function SubscribeForm() {
     const router = useRouter()
@@ -24,8 +16,7 @@ function SubscribeForm() {
     const selectedCourse = searchParams.get('course')
     const [batches, setBatches] = useState([])
     const [loadingBatches, setLoadingBatches] = useState(true)
-    const [paymentAccount, setPaymentAccount] = useState(emptyPaymentAccount)
-    const [loadingPaymentAccount, setLoadingPaymentAccount] = useState(true)
+    const { paymentSettings, loadingPaymentSettings } = usePaymentSettings()
     const [submitting, setSubmitting] = useState(false)
     const [form, setForm] = useState({
         name: '',
@@ -56,33 +47,6 @@ function SubscribeForm() {
         }
 
         loadBatches()
-    }, [])
-
-    useEffect(() => {
-        async function loadPaymentAccount() {
-            try {
-                const response = await fetch('/api/payment-account', { cache: 'no-store' })
-                if (!response.ok) {
-                    throw new Error('Payment account request failed.')
-                }
-
-                const account = await response.json()
-                setPaymentAccount({
-                    upi: account.upi || '',
-                    bankName: account.bankName || '',
-                    accountName: account.accountName || '',
-                    accountNumber: account.accountNumber || '',
-                    ifsc: account.ifsc || '',
-                })
-            } catch (error) {
-                toast.error('Could not load payment account details.')
-                setPaymentAccount(emptyPaymentAccount)
-            } finally {
-                setLoadingPaymentAccount(false)
-            }
-        }
-
-        loadPaymentAccount()
     }, [])
 
     const batchOptions = useMemo(() => {
@@ -173,7 +137,7 @@ function SubscribeForm() {
             return
         }
 
-        if (!paymentAccount.accountNumber) {
+        if (!paymentSettings.accountNumber) {
             toast.error('Payment account details are still loading. Please try again.')
             return
         }
@@ -219,7 +183,7 @@ function SubscribeForm() {
                 batchName: selectedBatchName,
                 amount: selectedBatch.amount,
                 utrNumber: form.utrNumber.trim(),
-                registeredAccountNumber: paymentAccount.accountNumber,
+                registeredAccountNumber: paymentSettings.accountNumber,
                 paymentMode: 'Online',
                 status: 'Pending',
                 createdAt: serverTimestamp(),
@@ -255,23 +219,23 @@ function SubscribeForm() {
                 <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
                     <aside className="rounded-2xl bg-gray-950 p-6 text-white shadow-xl">
                         <CreditCard className="h-10 w-10 text-primary-300" />
-                        <h1 className="mt-4 text-3xl font-bold">Manual payment instructions</h1>
-                        <p className="mt-3 text-gray-300">Complete your payment outside the app, then submit the details for admin approval.</p>
+                        <h1 className="mt-4 text-3xl font-bold">{paymentSettings.title}</h1>
+                        <p className="mt-3 text-gray-300">{paymentSettings.subtitle}</p>
                         <div className="mt-6 space-y-3 rounded-xl bg-white/10 p-4">
-                            {loadingPaymentAccount ? (
+                            {loadingPaymentSettings ? (
                                 <p className="text-gray-300">Loading registered account details...</p>
                             ) : (
                                 <>
-                                    <p><span className="text-gray-300">UPI:</span> {paymentAccount.upi || 'Not available'}</p>
-                                    <p><span className="text-gray-300">Bank:</span> {paymentAccount.bankName || 'Not available'}</p>
-                                    <p><span className="text-gray-300">Account:</span> {paymentAccount.accountName || 'Not available'}</p>
-                                    <p><span className="text-gray-300">Registered A/C No:</span> {paymentAccount.accountNumber || 'Not available'}</p>
-                                    <p><span className="text-gray-300">IFSC:</span> {paymentAccount.ifsc || 'Not available'}</p>
+                                    <p><span className="text-gray-300">UPI:</span> {paymentSettings.upi || 'Not available'}</p>
+                                    <p><span className="text-gray-300">Bank:</span> {paymentSettings.bankName || 'Not available'}</p>
+                                    <p><span className="text-gray-300">Account:</span> {paymentSettings.accountName || 'Not available'}</p>
+                                    <p><span className="text-gray-300">Registered A/C No:</span> {paymentSettings.accountNumber || 'Not available'}</p>
+                                    <p><span className="text-gray-300">IFSC:</span> {paymentSettings.ifsc || 'Not available'}</p>
                                 </>
                             )}
                         </div>
                         <div className="mt-6 space-y-3">
-                            {paymentInstructions.map((item) => (
+                            {paymentSettings.instructions.map((item) => (
                                 <div key={item} className="flex gap-3 text-sm text-gray-200">
                                     <CheckCircle className="mt-0.5 h-4 w-4 flex-none text-green-300" />
                                     <span>{item}</span>
@@ -328,7 +292,7 @@ function SubscribeForm() {
                             </label>
                         </div>
 
-                        <button type="submit" disabled={submitting || loadingPaymentAccount} className="mt-6 w-full rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-70">
+                        <button type="submit" disabled={submitting || loadingPaymentSettings} className="mt-6 w-full rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-70">
                             {submitting ? 'Submitting...' : 'Submit Subscription'}
                         </button>
                     </form>

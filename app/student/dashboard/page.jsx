@@ -8,6 +8,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore'
 import { BookOpen, CreditCard, LogOut, PlayCircle, ShieldAlert, UserRound } from 'lucide-react'
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase'
+import { usePaymentSettings } from '@/hooks/usePaymentSettings'
 
 function cleanValue(value) {
     if (value === undefined || value === null) return ''
@@ -166,7 +167,7 @@ export default function StudentDashboardPage() {
     const [student, setStudent] = useState(null)
     const [batch, setBatch] = useState(null)
     const [subscription, setSubscription] = useState(null)
-    const [paymentAccount, setPaymentAccount] = useState(null)
+    const { paymentSettings } = usePaymentSettings()
     const [videos, setVideos] = useState([])
 
     const canViewVideos = student?.paymentStatus === 'Approved' && student?.accountStatus === 'Active'
@@ -274,20 +275,6 @@ export default function StudentDashboardPage() {
 
         return () => unsubscribe()
     }, [router])
-
-    useEffect(() => {
-        async function loadPaymentAccount() {
-            try {
-                const response = await fetch('/api/payment-account', { cache: 'no-store' })
-                if (!response.ok) return
-                setPaymentAccount(await response.json())
-            } catch (error) {
-                setPaymentAccount(null)
-            }
-        }
-
-        loadPaymentAccount()
-    }, [])
 
     useEffect(() => {
         if (!isFirebaseConfigured || !student?.id) return undefined
@@ -432,15 +419,15 @@ export default function StudentDashboardPage() {
                     <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <div>
                             <p className="text-sm text-gray-500">Registered A/C No</p>
-                            <p className="font-semibold text-gray-950">{cleanValue(paymentAccount?.accountNumber) || 'Loading...'}</p>
+                            <p className="font-semibold text-gray-950">{cleanValue(paymentSettings.accountNumber) || 'Loading...'}</p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">IFSC</p>
-                            <p className="font-semibold text-gray-950">{cleanValue(paymentAccount?.ifsc) || 'Loading...'}</p>
+                            <p className="font-semibold text-gray-950">{cleanValue(paymentSettings.ifsc) || 'Loading...'}</p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">UPI</p>
-                            <p className="font-semibold text-gray-950">{cleanValue(paymentAccount?.upi) || 'Loading...'}</p>
+                            <p className="font-semibold text-gray-950">{cleanValue(paymentSettings.upi) || 'Loading...'}</p>
                         </div>
                         <div>
                             <p className="text-sm text-gray-500">Required Proof</p>

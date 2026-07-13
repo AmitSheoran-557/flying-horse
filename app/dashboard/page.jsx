@@ -8,12 +8,13 @@ import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import Link from 'next/link'
+import { usePaymentSettings } from '@/hooks/usePaymentSettings'
 
 export default function DashboardPage() {
     const { user, loading } = useAuth()
     const router = useRouter()
     const [enrolledCourses, setEnrolledCourses] = useState([])
-    const [paymentAccount, setPaymentAccount] = useState(null)
+    const { paymentSettings } = usePaymentSettings()
 
     useEffect(() => {
         if (!loading && !user) {
@@ -40,20 +41,6 @@ export default function DashboardPage() {
             ])
         }
     }, [user, loading, router])
-
-    useEffect(() => {
-        async function loadPaymentAccount() {
-            try {
-                const response = await fetch('/api/payment-account', { cache: 'no-store' })
-                if (!response.ok) return
-                setPaymentAccount(await response.json())
-            } catch (error) {
-                setPaymentAccount(null)
-            }
-        }
-
-        loadPaymentAccount()
-    }, [])
 
     if (loading) {
         return (
@@ -221,15 +208,15 @@ export default function DashboardPage() {
                             <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                                 <div className="rounded-lg bg-slate-50 p-4">
                                     <p className="text-sm text-gray-500">Registered A/C No</p>
-                                    <p className="mt-1 font-semibold text-gray-950">{paymentAccount?.accountNumber || 'Loading...'}</p>
+                                    <p className="mt-1 font-semibold text-gray-950">{paymentSettings.accountNumber || 'Loading...'}</p>
                                 </div>
                                 <div className="rounded-lg bg-slate-50 p-4">
                                     <p className="text-sm text-gray-500">IFSC</p>
-                                    <p className="mt-1 font-semibold text-gray-950">{paymentAccount?.ifsc || 'Loading...'}</p>
+                                    <p className="mt-1 font-semibold text-gray-950">{paymentSettings.ifsc || 'Loading...'}</p>
                                 </div>
                                 <div className="rounded-lg bg-slate-50 p-4">
                                     <p className="text-sm text-gray-500">UPI</p>
-                                    <p className="mt-1 font-semibold text-gray-950">{paymentAccount?.upi || 'Loading...'}</p>
+                                    <p className="mt-1 font-semibold text-gray-950">{paymentSettings.upi || 'Loading...'}</p>
                                 </div>
                                 <div className="rounded-lg bg-slate-50 p-4">
                                     <p className="text-sm text-gray-500">Required Proof</p>
