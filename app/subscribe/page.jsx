@@ -10,6 +10,9 @@ import { ArrowLeft, BadgeIndianRupee, CheckCircle, CreditCard } from 'lucide-rea
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase'
 import { usePaymentSettings } from '@/hooks/usePaymentSettings'
 
+const MIN_AMOUNT = 1
+const MAX_AMOUNT = 1000000
+
 function SubscribeForm() {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -40,6 +43,11 @@ function SubscribeForm() {
                 const snapshot = await getDocs(collection(db, 'batches'))
                 setBatches(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })))
             } catch (error) {
+                console.error('Failed to load batches.', {
+                    code: error.code,
+                    message: error.message,
+                    projectId: db.app.options.projectId,
+                })
                 setBatches([])
             } finally {
                 setLoadingBatches(false)
@@ -58,7 +66,9 @@ function SubscribeForm() {
                     amount: String(batch.amount || batch.price || batch.fee || '').trim(),
                     description: String(batch.description || batch.summary || batch.highlight || '').trim(),
                 }))
-                .filter((batch) => batch.id && batch.name && batch.amount)
+                // Existing batch documents do not include an amount field, so do not
+                // hide otherwise valid batches from the picker.
+                .filter((batch) => batch.id && batch.name)
         }
 
         return []
@@ -119,6 +129,16 @@ function SubscribeForm() {
         setForm((current) => ({ ...current, [name]: value }))
     }
 
+    function updateAmount(value) {
+        // A text input with inputMode="numeric" gives mobile users a numeric
+        // keyboard, while this removes pasted letters, signs, decimals, and other
+        // non-numeric characters that a type="number" input can still accept.
+        const digitsOnly = value.replace(/\D/g, '')
+        const amount = Number(digitsOnly)
+        const safeValue = amount > MAX_AMOUNT ? String(MAX_AMOUNT) : digitsOnly
+        setForm((current) => ({ ...current, amount: safeValue }))
+    }
+
     async function handleSubmit(event) {
         event.preventDefault()
 
@@ -127,8 +147,14 @@ function SubscribeForm() {
             return
         }
 
-        if (!form.name.trim() || !form.email.trim() || !form.phone.trim() || !selectedBatch || !selectedBatch.amount || !form.utrNumber.trim() || !form.password) {
+        const amount = Number(form.amount)
+        if (!form.name.trim() || !form.email.trim() || !form.phone.trim() || !selectedBatch || !form.utrNumber.trim() || !form.password) {
             toast.error('Please fill all required fields.')
+            return
+        }
+
+        if (!Number.isInteger(amount) || amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
+            toast.error(`Enter a whole-number amount between Rs. ${MIN_AMOUNT} and Rs. ${MAX_AMOUNT.toLocaleString()}.`)
             return
         }
 
@@ -164,7 +190,7 @@ function SubscribeForm() {
                 batchId: form.batchId,
                 batchName: selectedBatchName,
                 course: selectedBatchName,
-                amount: selectedBatch.amount,
+                amount,
                 utrNumber: form.utrNumber.trim(),
                 joiningDate: new Date().toISOString().slice(0, 10),
                 paymentMode: 'Online',
@@ -181,7 +207,7 @@ function SubscribeForm() {
                 phone: form.phone.trim(),
                 batchId: form.batchId,
                 batchName: selectedBatchName,
-                amount: selectedBatch.amount,
+                amount,
                 utrNumber: form.utrNumber.trim(),
                 registeredAccountNumber: paymentSettings.accountNumber,
                 paymentMode: 'Online',
@@ -193,7 +219,7 @@ function SubscribeForm() {
             await addDoc(collection(db, 'notifications'), {
                 type: 'payment',
                 title: 'New payment request',
-                message: `${form.name.trim()} submitted a payment request for Rs. ${selectedBatch.amount}.`,
+                message: `${form.name.trim()} submitted a payment request for Rs. ${amount}.`,
                 read: false,
                 createdAt: serverTimestamp(),
             })
@@ -280,7 +306,20 @@ function SubscribeForm() {
                             </label>
                             <label>
                                 <span className="text-sm font-semibold text-gray-700">Amount</span>
-                                <input className="input-field mt-1 bg-slate-50" value={selectedBatch?.amount || ''} readOnly required />
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    className="input-field mt-1"
+                                    value={form.amount}
+                                    onChange={(event) => updateAmount(event.target.value)}
+                                    placeholder={`Rs. ${MIN_AMOUNT} to Rs. ${MAX_AMOUNT.toLocaleString()}`}
+                                    aria-describedby="amount-help"
+                                    required
+                                />
+                                <p id="amount-help" className="mt-1 text-xs text-gray-500">
+                                    Enter a whole amount from Rs. {MIN_AMOUNT} to Rs. {MAX_AMOUNT.toLocaleString()}. Selecting a batch fills its fee, which you can edit.
+                                </p>
                             </label>
                             <label>
                                 <span className="text-sm font-semibold text-gray-700">UTR / transaction number</span>

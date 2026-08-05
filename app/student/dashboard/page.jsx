@@ -27,6 +27,10 @@ function getMillis(value) {
     return Number.isNaN(parsed) ? 0 : parsed
 }
 
+function normalizeBatchId(value) {
+    return typeof value === 'string' ? value.trim() : ''
+}
+
 function getVideoSource(rawUrl) {
     const url = cleanValue(rawUrl).trim()
     if (!url) return null
@@ -221,28 +225,14 @@ export default function StudentDashboardPage() {
                     ? { id: studentDoc.id, ...studentDoc.data() }
                     : { id: user.uid, email: user.email || '', name: user.displayName || '' }
                 setStudent(studentData)
-                const batchRequest = studentData.batchId
-                    ? getDoc(doc(db, 'batches', studentData.batchId))
-                    : Promise.resolve(null)
                 const paymentsQuery = query(collection(db, 'paymentRequests'), where('studentId', '==', user.uid))
 
                 if (studentData.paymentStatus === 'Approved' && studentData.accountStatus === 'Active') {
-                    const batchVideosRequest = studentData.batchId
-                        ? getDocs(query(collection(db, 'videos'), where('batchId', '==', studentData.batchId)))
-                        : Promise.resolve({ docs: [] })
                     const studentVideosQuery = query(collection(db, 'videos'), where('studentId', '==', user.uid))
-                    const [batchDoc, batchVideosSnapshot, studentVideosSnapshot, paymentsSnapshot] = await Promise.all([
-                        batchRequest,
-                        batchVideosRequest,
+                    const [studentVideosSnapshot, paymentsSnapshot] = await Promise.all([
                         getDocs(studentVideosQuery),
                         getDocs(paymentsQuery),
                     ])
-
-                    if (batchDoc?.exists()) {
-                        setBatch({ id: batchDoc.id, ...batchDoc.data() })
-                    } else {
-                        setBatch(null)
-                    }
 
                     const paymentRequests = paymentsSnapshot.docs
                         .map((item) => ({ id: item.id, ...item.data() }))
@@ -250,23 +240,19 @@ export default function StudentDashboardPage() {
                     setSubscription(paymentRequests[0] || null)
 
                     const videoMap = new Map()
-                    batchVideosSnapshot.docs.forEach((item) => videoMap.set(item.id, { id: item.id, ...item.data() }))
                     studentVideosSnapshot.docs.forEach((item) => videoMap.set(item.id, { id: item.id, ...item.data() }))
                     setVideos(Array.from(videoMap.values()))
                 } else {
-                    const [batchDoc, paymentsSnapshot] = await Promise.all([
-                        batchRequest,
-                        getDocs(paymentsQuery),
-                    ])
+                    const paymentsSnapshot = await getDocs(paymentsQuery)
                     const paymentRequests = paymentsSnapshot.docs
                         .map((item) => ({ id: item.id, ...item.data() }))
                         .sort((first, second) => getMillis(second.updatedAt || second.createdAt) - getMillis(first.updatedAt || first.createdAt))
 
-                    setBatch(batchDoc?.exists() ? { id: batchDoc.id, ...batchDoc.data() } : null)
                     setSubscription(paymentRequests[0] || null)
                     setVideos([])
                 }
             } catch (error) {
+                console.error('Failed to load the student dashboard.', error)
                 toast.error('Could not load dashboard.')
             } finally {
                 setLoading(false)
@@ -279,22 +265,30 @@ export default function StudentDashboardPage() {
     useEffect(() => {
         if (!isFirebaseConfigured || !student?.id) return undefined
 
-        const unsubscribeStudent = onSnapshot(doc(db, 'students', student.id), (snapshot) => {
-            if (!snapshot.exists()) return
-            setStudent((current) => ({
-                ...(current || {}),
-                id: snapshot.id,
-                ...snapshot.data(),
-            }))
-        })
+        const unsubscribeStudent = onSnapshot(
+            doc(db, 'students', student.id),
+            (snapshot) => {
+                if (!snapshot.exists()) return
+                setStudent((current) => ({
+                    ...(current || {}),
+                    id: snapshot.id,
+                    ...snapshot.data(),
+                }))
+            },
+            (error) => console.error('Failed to subscribe to the student document.', error),
+        )
 
         const paymentsQuery = query(collection(db, 'paymentRequests'), where('studentId', '==', student.id))
-        const unsubscribePayments = onSnapshot(paymentsQuery, (snapshot) => {
-            const paymentRequests = snapshot.docs
-                .map((item) => ({ id: item.id, ...item.data() }))
-                .sort((first, second) => getMillis(second.updatedAt || second.createdAt) - getMillis(first.updatedAt || first.createdAt))
-            setSubscription(paymentRequests[0] || null)
-        })
+        const unsubscribePayments = onSnapshot(
+            paymentsQuery,
+            (snapshot) => {
+                const paymentRequests = snapshot.docs
+                    .map((item) => ({ id: item.id, ...item.data() }))
+                    .sort((first, second) => getMillis(second.updatedAt || second.createdAt) - getMillis(first.updatedAt || first.createdAt))
+                setSubscription(paymentRequests[0] || null)
+            },
+            (error) => console.error('Failed to subscribe to payment requests.', error),
+        )
 
         return () => {
             unsubscribeStudent()
@@ -303,27 +297,64 @@ export default function StudentDashboardPage() {
     }, [student?.id])
 
     useEffect(() => {
+        if (!isFirebaseConfigured) return undefined
+
+        const rawBatchId = student?.batchId
+        const batchId = normalizeBatchId(rawBatchId)
+        if (!batchId) {
+            setBatch(null)
+            return undefined
+        }
+
+        if (rawBatchId !== batchId) {
+            console.warn('Whitespace was removed from students.batchId before reading the batch.', { rawBatchId, batchId })
+        }
+
+        const batchRef = doc(db, 'batches', batchId)
+        console.debug('Subscribing to Firestore batch.', {
+            path: batchRef.path,
+            batchId,
+            projectId: db.app.options.projectId,
+        })
+
+        return onSnapshot(
+            batchRef,
+            (snapshot) => {
+                if (!snapshot.exists()) {
+                    console.warn('Batch document does not exist at the requested path.', { path: batchRef.path, batchId })
+                    setBatch(null)
+                    return
+                }
+                setBatch({ id: snapshot.id, ...snapshot.data() })
+            },
+            (error) => {
+                console.error('Failed to subscribe to batch.', {
+                    code: error.code,
+                    message: error.message,
+                    path: batchRef.path,
+                    projectId: db.app.options.projectId,
+                })
+                setBatch(null)
+                toast.error(`Could not load batch: ${error.code || error.message}`)
+            },
+        )
+    }, [student?.batchId])
+
+    useEffect(() => {
         if (!isFirebaseConfigured || !student?.id) return undefined
 
         let cancelled = false
 
         async function loadAccessData() {
             try {
-                const batchDoc = student.batchId
-                    ? await getDoc(doc(db, 'batches', student.batchId))
-                    : null
-
-                if (!cancelled) {
-                    setBatch(batchDoc?.exists() ? { id: batchDoc.id, ...batchDoc.data() } : null)
-                }
-
                 if (student.paymentStatus !== 'Approved' || student.accountStatus !== 'Active') {
                     if (!cancelled) setVideos([])
                     return
                 }
 
-                const batchVideosRequest = student.batchId
-                    ? getDocs(query(collection(db, 'videos'), where('batchId', '==', student.batchId)))
+                const batchId = normalizeBatchId(student.batchId)
+                const batchVideosRequest = batchId
+                    ? getDocs(query(collection(db, 'videos'), where('batchId', '==', batchId)))
                     : Promise.resolve({ docs: [] })
                 const studentVideosQuery = query(collection(db, 'videos'), where('studentId', '==', student.id))
                 const [batchVideosSnapshot, studentVideosSnapshot] = await Promise.all([
@@ -339,6 +370,7 @@ export default function StudentDashboardPage() {
                     setVideos(Array.from(videoMap.values()))
                 }
             } catch (error) {
+                console.error('Failed to load videos for the student.', error)
                 if (!cancelled) {
                     setVideos([])
                 }
@@ -382,7 +414,7 @@ export default function StudentDashboardPage() {
                     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                         <UserRound className="h-7 w-7 text-primary-600" />
                         <p className="mt-3 text-sm text-gray-500">Batch</p>
-                        <h2 className="text-lg font-bold text-gray-950">{cleanValue(batch?.name || batch?.title || student?.batchName || student?.batchId)}</h2>
+                        <h2 className="text-lg font-bold text-gray-950">{cleanValue(batch?.batchName || batch?.name || batch?.title || batch?.courseName || student?.batchName || student?.batchId)}</h2>
                     </div>
                     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                         <ShieldAlert className="h-7 w-7 text-primary-600" />
@@ -442,7 +474,7 @@ export default function StudentDashboardPage() {
                         <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                             <div>
                                 <p className="text-sm text-gray-500">Course / Batch</p>
-                                <p className="font-semibold text-gray-950">{cleanValue(subscription?.batchName || batch?.name || batch?.title || student?.batchName || student?.course)}</p>
+                                <p className="font-semibold text-gray-950">{cleanValue(subscription?.batchName || batch?.batchName || batch?.name || batch?.title || batch?.courseName || student?.batchName || student?.course)}</p>
                             </div>
                             <div>
                                 <p className="text-sm text-gray-500">Amount</p>
